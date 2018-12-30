@@ -1,15 +1,24 @@
 #import appropriate python modules to the program
 import numpy as np
 import cv2
+import pickle
 from matplotlib import pyplot as plt
-import freenect
 
+print cv2.__version__
+
+def imshow(w, f):
+    cv2.imshow(w, f)
 
 # capturing video from Kinect Xbox 360
-def get_video():
-    array,_ = freenect.sync_get_video()
-    array = cv2.cvtColor(array,cv2.COLOR_RGB2BGR)
-    return array
+def get_video(vc):
+    if vc.isOpened(): # try to get the first frame
+        rval, frame = vc.read()
+        imshow("raw_frame", frame)
+        return frame
+        #array = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        #return array
+    else:
+        return None
 
 # callback function for selecting object by clicking 4-corner-points of the object
 def select_object(event, x, y, flags, param):
@@ -20,13 +29,14 @@ def select_object(event, x, y, flags, param):
 
 # selecting object by clicking 4-corner-points
 def select_object_mode():
-    global input_mode, initialize_mode
+    global input_mode, initialize_mode, frame_static
     input_mode = True
     
+	#global frame_static #new line
     frame_static = frame.copy()
 
     while len(box_pts) < 4:
-        cv2.imshow("frame", frame)
+        imshow("frame", frame)
         cv2.waitKey(1)
     
     initialize_mode = True
@@ -89,7 +99,9 @@ def orb_feature_descriptor(img_object):
 def brute_force_feature_matcher(kp1, des1, kp2, des2):
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     matches = bf.match(des1, des2)
-    return sorted(matches, key = lambda x:x.distance)
+    #return sorted(matches, key = lambda x:x.distance)
+    sorted_matches = sorted(matches, key = lambda x:x.distance)	
+    return sorted_matches
 
 # finding homography matrix between reference and image frame
 def find_homography_object(kp1, kp2, matches):
@@ -111,7 +123,7 @@ def output_perspective_transform(img_object, M):
 # solving pnp using iterative LMA algorithm
 def iterative_solve_pnp(object_points, image_points):
     image_points = image_points.reshape(-1,2)
-    retval, rotation, translation = cv2.solvePnP(object_points, image_points, kinect_intrinsic_param, kinect_distortion_param)
+    retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param)
     return rotation, translation
 
 # drawing box around object
@@ -198,41 +210,55 @@ record_mode = False
 
 t1, t2, t3, r1, r2, r3 = [], [], [], [], [], []
 
-kinect_intrinsic_param = np.array([[514.04093664, 0., 320], [0., 514.87476583, 240], [0., 0., 1.]])
-kinect_distortion_param = np.array([2.68661165e-01, -1.31720458e+00, -3.22098653e-03, -1.11578383e-03, 2.44470018e+00])
+with open('calib.pickle','r') as picklefile:
+    ret, mtx, dist, rvecs, tvecs = pickle.load(picklefile)
+    intrinsic_param = mtx
+    distortion_param = dist
+#kinect_intrinsic_param = np.array([[514.04093664, 0., 320], [0., 514.87476583, 240], [0., 0., 1.]])
+#kinect_distortion_param = np.array([2.68661165e-01, -1.31720458e+00, -3.22098653e-03, -1.11578383e-03, 2.44470018e+00])
 
 orb = cv2.ORB_create()
 
 cv2.namedWindow("frame")
 cv2.setMouseCallback("frame", select_object)
 
+vc  = cv2.VideoCapture(0)
+
+
 while True:
     
-    frame = get_video()
-    
+    frame = get_video(vc)
     k = cv2.waitKey(1) & 0xFF
     
-    # press i to enter input mode
-    if k == ord('i'):
-        
-        # select object by clicking 4-corner-points
-        select_object_mode()
-        
-        # set the boundary of reference object
-        pts2, right_bound, left_bound, lower_bound, upper_bound = set_boundary_of_reference(box_pts)
-        
-        # do perspective transform to reference object
-        img_object = input_perspective_transform(box_pts, pts2, right_bound, left_bound, lower_bound, upper_bound)
-        
-        track_mode = True
+    if not track_mode:
+
+        # press i to enter input mode
+        if k == ord('i'):
+            output_frame = frame.copy()
+            # select object by clicking 4-corner-points
+            select_object_mode()
+
+            # set the boundary of reference object
+            pts2, right_bound, left_bound, lower_bound, upper_bound = set_boundary_of_reference(box_pts)
+
+            # do perspective transform to reference object
+            img_object = input_perspective_transform(box_pts, pts2, right_bound, left_bound, lower_bound, upper_bound)
+            kp1, des1 = orb.detectAndCompute(img_object,None)
+
+            print "track_mode is being set to True"
+            track_mode = True
     
     # track mode is run immediately after user selects 4-corner-points of object
-    if track_mode is True:
+    else:
         # feature detection and description
-        kp1, des1, kp2, des2 = orb_feature_descriptor(img_object)
+        kp2, des2 = orb.detectAndCompute(frame,None)
         
         # feature matching
         matches = brute_force_feature_matcher(kp1, des1, kp2, des2)
+
+	#draw match
+	output_frame = cv2.drawMatches(frame_static, kp1, frame, kp2, matches, output_frame, flags=2)
+        imshow("output_frame", output_frame)
         
         # find homography matrix
         M, mask = find_homography_object(kp1, kp2, matches)
@@ -274,9 +300,13 @@ while True:
         
         # show object position and orientation value to frame
         frame = put_position_orientation_value_to_frame(translation, rotation)
-    
-    cv2.imshow("frame", frame)
-    
+
+    imshow("frame", frame)
+    #if track_mode != True and frame != None:
+        #cv2.imshow("debug_frame", debug_frame)
+    #else:
+        #cv2.imshow("frame",frame)
+
     # break when user pressing ESC
     if k == 27:
         break
