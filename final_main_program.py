@@ -130,8 +130,19 @@ def solve_pnp(object_points, image_points, prev_rotation, prev_translation):
     #image_points = np.ascontiguousarray(image_points[:,:2]).reshape(image_points[0],1,2)
 
     use_prev_guess = prev_rotation is not None and prev_translation is not None
+    
 
     retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)
+
+    axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
+    
+    img_pts, jac = cv2.projectPoints(axis, rotation, translation, intrinsic_param, distortion_param)
+
+    img = draw(img, object_points, img_pts)
+    cv2.imshow('img',img)
+
+
+    #debug by reprojecting points
     
     #if use_prev_guess:
     #    retval, rotation, translation = \
