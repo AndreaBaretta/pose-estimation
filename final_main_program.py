@@ -78,7 +78,7 @@ def set_boundary_of_reference(box_pts):
     pts2 = np.float32([upper_left_point, upper_right_point, lower_left_point, lower_right_point])
     
     # display dimension of reference object image to terminal
-    print(pts2)
+    #print(pts2)
     
     return pts2, right_bound, left_bound, lower_bound, upper_bound
 
@@ -129,30 +129,38 @@ def solve_pnp(object_points, image_points, prev_rotation, prev_translation):
     image_points = image_points.reshape(-1,2)
     #image_points = np.ascontiguousarray(image_points[:,:2]).reshape(image_points[0],1,2)
 
-    use_prev_guess = prev_rotation is not None and prev_translation is not None
-    
-
     retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)
 
-    axis = np.float32([[20,0,0], [0,20,0], [0,0,-20]]).reshape(-1,3)
+    print("solve_pnp: rotation (angle) =", np.arcsin(rotation).transpose())
+    
+    axis = np.float32([[1,0,0], [0,1,0], [0,0,-1]]).reshape(-1,3)
     
     img_pts, jac = cv2.projectPoints(axis, rotation, translation, intrinsic_param, distortion_param)
 
     
     def draw(img_, corners, imgpts):
-        corner = tuple(corners[0].ravel())
-        print("corner =", corner)
-        print("imgpts =",imgpts)
-        print("ravel =", imgpts[0].ravel())
-        corner = corner[0:2]
-        img_ = cv2.line(img_, corner, tuple(imgpts[0].ravel()), (255,0,0), 5)
-        img_ = cv2.line(img_, corner, tuple(imgpts[1].ravel()), (0,255,0), 5)
-        img_ = cv2.line(img_, corner, tuple(imgpts[2].ravel()), (0,0,255), 5)
-        return img_
+        if np.absolute(imgpts).max() > 2e9:
+            return img_
+        else:
+            corner = tuple(corners[0].ravel())
+            #print("corner =", corner)
+            #print("imgpts =",imgpts)
+            #print("ravel =", imgpts[0].ravel())
+            corner = corner[0:2]
+
+            t0 = tuple(imgpts[0].ravel())
+            img_ = cv2.line(img_, corner, t0, (255,0,0), 5)
+
+            t1 = tuple(imgpts[1].ravel())
+            img_ = cv2.line(img_, corner, t1, (0,255,0), 5)
+
+            t2 = tuple(imgpts[2].ravel())
+            img_ = cv2.line(img_, corner, t2, (0,0,255), 5)
+            return img_
 
     
-    reprojected = draw(frame, object_points, img_pts)
-    cv2.imshow('reprojected',reprojected)
+    axes = draw(frame, object_points, img_pts)
+    cv2.imshow('axes',axes)
 
 
     #debug by reprojecting points
@@ -225,11 +233,12 @@ def put_position_orientation_value_to_frame(_translation, _rotation):
     font_scale = 0.4
     font_thickness = 1
     translation = np.transpose(_translation)[0]
-    rotation = np.transpose(_rotation)[0]
+    rotation = np.arcsin(np.transpose(_rotation)[0])
+    print("shape(_rotation) = ", np.shape(_rotation), "shape(rotation) =", np.shape(rotation))
     
     
-    print("translation:", translation)
-    print("rotation:", rotation)
+    #print("translation:", translation)
+    #print("rotation:", rotation)
     
     cv2.putText(frame,'position(cm)',(10,30), font, font_scale,(0,255,0),font_thickness,cv2.LINE_AA)
     cv2.putText(frame,'x:'+str(round(translation[0],2)),(250,30), font, font_scale,(0,0,255),font_thickness,cv2.LINE_AA)
