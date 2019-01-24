@@ -134,12 +134,25 @@ def solve_pnp(object_points, image_points, prev_rotation, prev_translation):
 
     retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)
 
-    axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
+    axis = np.float32([[20,0,0], [0,20,0], [0,0,-20]]).reshape(-1,3)
     
     img_pts, jac = cv2.projectPoints(axis, rotation, translation, intrinsic_param, distortion_param)
 
-    img = draw(img, object_points, img_pts)
-    cv2.imshow('img',img)
+    
+    def draw(img_, corners, imgpts):
+        corner = tuple(corners[0].ravel())
+        print("corner =", corner)
+        print("imgpts =",imgpts)
+        print("ravel =", imgpts[0].ravel())
+        corner = corner[0:2]
+        img_ = cv2.line(img_, corner, tuple(imgpts[0].ravel()), (255,0,0), 5)
+        img_ = cv2.line(img_, corner, tuple(imgpts[1].ravel()), (0,255,0), 5)
+        img_ = cv2.line(img_, corner, tuple(imgpts[2].ravel()), (0,0,255), 5)
+        return img_
+
+    
+    reprojected = draw(frame, object_points, img_pts)
+    cv2.imshow('reprojected',reprojected)
 
 
     #debug by reprojecting points
@@ -323,8 +336,8 @@ while True:
             #print("# of ORB descriptors (static) =", len(kp1))
 
             #print("track_mode is being set to True")
-            with open('reference_setup.pickle', 'wb') as pickle_file:
-                pickle.dump((frame_static, pts2, right_bound, left_bound, lower_bound, upper_bound, img_object, kp1, des1), pickle_file)
+            #with open('reference_setup.pickle', 'wb') as pickle_file:
+            #    pickle.dump((frame_static, pts2, right_bound, left_bound, lower_bound, upper_bound, img_object, kp1, des1), pickle_file)
             track_mode = True
     
     # track mode is run immediately after user selects 4-corner-points of object
