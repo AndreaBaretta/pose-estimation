@@ -169,8 +169,7 @@ def solve_pnp(object_points, image_points, prev_rotation, prev_translation):
     #    retval, rotation, translation = \
     #        cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)
     #else:
-    #    retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)
-        
+    #    retval, rotation, translation = cv2.solvePnP(object_points, image_points, intrinsic_param, distortion_param, flags=solve_pnp_flag)        
         
         
     return rotation, translation
@@ -233,8 +232,10 @@ def put_position_orientation_value_to_frame(_translation, _rotation):
     font_scale = 0.4
     font_thickness = 1
     translation = np.transpose(_translation)[0]
-    rotation = np.arcsin(np.transpose(_rotation)[0])
-    print("shape(_rotation) = ", np.shape(_rotation), "shape(rotation) =", np.shape(rotation))
+    translation = translation*2.7/100*2/13*10
+    #rotation = np.arcsin(np.transpose(_rotation)[0])
+    rotation = _rotation
+    #print("shape(_rotation) = ", np.shape(_rotation), "shape(rotation) =", np.shape(rotation))
     
     
     #print("translation:", translation)
@@ -303,7 +304,7 @@ orb = cv2.ORB_create()
 cv2.namedWindow("frame")
 cv2.setMouseCallback("frame", select_object)
 
-vc  = cv2.VideoCapture(0)
+vc  = cv2.VideoCapture(1)
 
 
 rotation = None
